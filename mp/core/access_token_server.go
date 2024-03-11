@@ -1,6 +1,8 @@
 package core
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -134,10 +136,22 @@ func (srv *DefaultAccessTokenServer) updateToken(currentToken string) (token *ac
 		}
 	}
 
-	url := "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=" + srv.appId +
-		"&secret=" + srv.appSecret
+	url := "https://api.weixin.qq.com/cgi-bin/stable_token"
 	api.DebugPrintGetRequest(url)
-	httpResp, err := srv.httpClient.Get(url)
+	requestBody := map[string]string{
+		"grant_type": "client_credential",
+		"appid":      srv.appId,
+		"secret":     srv.appSecret,
+	}
+
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(requestBody)
+	if err != nil {
+		atomic.StorePointer(&srv.tokenCache, nil)
+		return
+	}
+
+	httpResp, err := srv.httpClient.Post(url, "application/json; charset=utf-8", &buf)
 	if err != nil {
 		atomic.StorePointer(&srv.tokenCache, nil)
 		return
